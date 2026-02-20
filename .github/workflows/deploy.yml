@@ -1,30 +1,36 @@
 name: Deploy Fullstack to EC2
 
 on:
-push:
-branches:
-- main
+  push:
+    branches:
+      - main
 
 jobs:
-deploy:
-runs-on: ubuntu-latest
+  deploy:
+    runs-on: ubuntu-latest
 
-```
-steps:
-  # Checkout repository
-  - name: Checkout code
-    uses: actions/checkout@v3
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-  # Deploy to EC2 via SSH
-  - name: Deploy application on EC2
-    uses: appleboy/ssh-action@v0.1.7
-    with:
-      host: ${{ secrets.EC2_IP }}
-      username: ubuntu
-      key: ${{ secrets.EC2_KEY }}
-      script: |
-        cd ~/fullstack-project
-        git pull origin main
-        sudo docker-compose down || true
-        sudo docker-compose up -d --build
-```
+      - name: Deploy to EC2 Server
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          port: 22
+          script: |
+            echo "Connected to EC2"
+            cd ~/fullstack-project
+
+            echo "Pulling latest code"
+            git pull origin main
+
+            echo "Stopping old containers"
+            docker-compose down
+
+            echo "Starting new containers"
+            docker-compose up -d --build
+
+            echo "Deployment completed"
