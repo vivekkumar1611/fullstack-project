@@ -14,29 +14,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history needed for SonarQube
+          fetch-depth: 0
 
-      # -------------------
-      # SonarQube Scan
-      # -------------------
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-      # -------------------
-      # Docker Build
-      # -------------------
       - name: Build backend image
         run: docker build -t backend:latest ./backend
 
       - name: Build frontend image
         run: docker build -t frontend:latest ./frontend
 
-      # -------------------
-      # Docker Login & Push to Nexus
-      # -------------------
       - name: Login to Nexus Docker Registry
         run: echo ${{ secrets.NEXUS_PASSWORD }} | docker login 16.16.177.176:8083 -u ${{ secrets.NEXUS_USER }} --password-stdin
 
@@ -63,12 +54,12 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} bash << 'EOF'
-cd ~/fullstack-project
-git pull origin main
-docker compose down
-docker compose up -d --build --remove-orphans
-EOF
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} << 'EOF'
+          cd ~/fullstack-project
+          git pull origin main
+          docker compose down
+          docker compose up -d --build --remove-orphans
+          EOF
 
       - name: Cleanup SSH Key
         run: rm -f key.pem
