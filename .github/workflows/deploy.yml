@@ -11,39 +11,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history needed for SonarQube
 
       # -------------------
-      # SonarQube Backend Scan
+      # SonarQube Scan
       # -------------------
-      - name: SonarQube Backend Scan
+      - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@master
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          args: >
-            -Dsonar.projectKey=backend
-            -Dsonar.projectName="Backend"
-            -Dsonar.sources=./backend
-
-      # -------------------
-      # SonarQube Frontend Scan
-      # -------------------
-      - name: SonarQube Frontend Scan
-        uses: sonarsource/sonarqube-scan-action@master
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          args: >
-            -Dsonar.projectKey=frontend
-            -Dsonar.projectName="Frontend"
-            -Dsonar.sources=./frontend
+          # Optional: define sonar.projectKey if needed
+          # SONAR_PROJECT_KEY: my-project-key
 
       # -------------------
       # Docker Build
