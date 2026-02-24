@@ -25,10 +25,10 @@ jobs:
           projectBaseDir: .
           scannerVersion: 8.0.1.6346
           scannerBinariesUrl: https://binaries.sonarsource.com/Distribution/sonar-scanner-cli
-          extraProperties: |
-            sonar.projectKey=my-project-key
-            sonar.projectName=My Project
-            sonar.sources=.
+          args: >
+            -Dsonar.projectKey=my-project-key
+            -Dsonar.projectName="My Project"
+            -Dsonar.sources=.
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
