@@ -46,7 +46,7 @@ jobs:
       # Docker Login & Push to Nexus
       # -------------------
       - name: Login to Nexus Docker Registry
-        run: echo "${{ secrets.NEXUS_PASSWORD }}" | docker login 16.16.177.176:8083 -u "${{ secrets.NEXUS_USER }}" --password-stdin
+        run: echo "${{ secrets.NEXUS_PASSWORD }}" | docker login 16.16.177.176:8083 -u "${{ secrets.NEXUS_USERNAME }}" --password-stdin
 
       - name: Tag and Push backend
         run: |
