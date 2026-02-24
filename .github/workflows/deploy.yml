@@ -1,4 +1,4 @@
-name: CI/CD Fullstack (Sonar + Nexus + EC2)
+name: Deploy to EC2
 
 on:
   push:
@@ -6,51 +6,23 @@ on:
       - main
 
 jobs:
-  build-test-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # SonarQube Scan
-      - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@v2
-        env:
-          SONAR_HOST_URL: http://16.16.177.176:9000
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
-      # Login to Nexus Docker Registry
-      - name: Login to Nexus
+      - name: Setup SSH
         run: |
-          echo "${{ secrets.NEXUS_PASSWORD }}" | docker login \
-          http://${{ secrets.NEXUS_URL }} \
-          -u ${{ secrets.NEXUS_USERNAME }} \
-          --password-stdin
+          echo "${{ secrets.EC2_KEY }}" > key.pem
+          chmod 600 key.pem
 
-      # Build Backend Image
-      - name: Build Backend Image
-        run: docker build -t backend ./backend
-
-      # Tag Backend Image
-      - name: Tag Backend Image
-        run: docker tag backend \
-          ${{ secrets.NEXUS_URL }}/docker-hosted/backend:latest
-
-      # Push Backend Image
-      - name: Push Backend Image
-        run: docker push \
-          ${{ secrets.NEXUS_URL }}/docker-hosted/backend:latest
-
-      # Deploy to EC2
       - name: Deploy to EC2
-        uses: appleboy/ssh-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_IP }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            cd ~/fullstack-project
-            docker pull ${{ secrets.NEXUS_URL }}/docker-hosted/backend:latest
-            docker-compose down
-            docker-compose up -d
+        run: |
+          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} << 'EOF'
+          cd ~/fullstack-project
+          git pull origin main
+          docker compose down
+          docker compose up -d --build
+          EOF
