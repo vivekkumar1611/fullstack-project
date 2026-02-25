@@ -12,12 +12,12 @@ jobs:
 
     steps:
       # -------------------
-      # Checkout Code
+      # Checkout code
       # -------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history needed for SonarQube
+          fetch-depth: 0
 
       # -------------------
       # SonarQube Scan
@@ -26,12 +26,14 @@ jobs:
         uses: sonarsource/sonarqube-scan-action@master
         with:
           projectBaseDir: .
-          scannerVersion: 8.0.1.6346
-          scannerBinariesUrl: https://binaries.sonarsource.com/Distribution/sonar-scanner-cli
+          scannerVersion: latest
           args: >
             -Dsonar.projectKey=fullstack-project
             -Dsonar.projectName="Fullstack Project"
             -Dsonar.sources=backend,frontend
+            -Dsonar.host.url=${{ env.SONAR_HOST_URL }}
+            -Dsonar.login=${{ env.SONAR_TOKEN }}
+            -Dsonar.ssl.verificationMode=none
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
@@ -46,26 +48,29 @@ jobs:
         run: docker build -t frontend:latest ./frontend
 
       # -------------------
-      # Docker HTTP Registry Fix
+      # Docker Insecure Registry Setup
       # -------------------
       - name: Configure Docker for insecure registry
         run: |
-          mkdir -p ~/.docker
-          echo '{ "insecure-registries":["vivekbackend.duckdns.org:5000"] }' > ~/.docker/daemon.json
+          echo '{ "insecure-registries":["vivekbackend.duckdns.org:5000"] }' | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
 
       # -------------------
-      # Docker Login & Push
+      # Docker Login
       # -------------------
       - name: Docker Login
         run: |
           echo "${{ secrets.NEXUS_PASSWORD }}" | docker login http://vivekbackend.duckdns.org:5000 -u "${{ secrets.NEXUS_USERNAME }}" --password-stdin
 
-      - name: Tag and Push backend
+      # -------------------
+      # Docker Push
+      # -------------------
+      - name: Push backend image
         run: |
           docker tag backend:latest vivekbackend.duckdns.org:5000/backend:1
           docker push vivekbackend.duckdns.org:5000/backend:1
 
-      - name: Tag and Push frontend
+      - name: Push frontend image
         run: |
           docker tag frontend:latest vivekbackend.duckdns.org:5000/frontend:1
           docker push vivekbackend.duckdns.org:5000/frontend:1
