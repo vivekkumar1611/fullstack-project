@@ -43,20 +43,21 @@ jobs:
         run: docker build -t frontend:latest ./frontend
 
       # -------------------
-      # Docker Login & Push to HTTP Nexus
+      # Docker Login & Push to HTTPS Nexus
       # -------------------
-      - name: Docker Login to Nexus
-        run: echo "${{ secrets.NEXUS_PASSWORD }}" | docker login http://16.16.177.176:8083 -u "${{ secrets.NEXUS_USERNAME }}" --password-stdin
+      - name: Docker Login to Nexus (HTTPS)
+        run: |
+          echo "${{ secrets.NEXUS_PASSWORD }}" | docker login https://vivekbackend.duckdns.org:8443 -u "${{ secrets.NEXUS_USERNAME }}" --password-stdin
 
       - name: Tag and Push backend
         run: |
-          docker tag backend:latest 16.16.177.176:8083/backend:1
-          docker push 16.16.177.176:8083/backend:1
+          docker tag backend:latest vivekbackend.duckdns.org:8443/backend:1
+          docker push vivekbackend.duckdns.org:8443/backend:1
 
       - name: Tag and Push frontend
         run: |
-          docker tag frontend:latest 16.16.177.176:8083/frontend:1
-          docker push 16.16.177.176:8083/frontend:1
+          docker tag frontend:latest vivekbackend.duckdns.org:8443/frontend:1
+          docker push vivekbackend.duckdns.org:8443/frontend:1
 
   deploy:
     name: Deploy to EC2
@@ -72,10 +73,10 @@ jobs:
       - name: Deploy to EC2
         run: |
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} << 'EOF'
-          cd ~/fullstack-project
-          git pull origin main
-          docker compose down
-          docker compose up -d --build --remove-orphans
+            cd ~/fullstack-project
+            git pull origin main
+            docker compose down
+            docker compose up -d --build --remove-orphans
           EOF
 
       - name: Cleanup SSH Key
