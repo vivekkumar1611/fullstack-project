@@ -11,13 +11,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # -------------------
+      # 1️⃣ Checkout repository
+      # -------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history needed for SonarQube
 
       # -------------------
-      # SonarQube Scan
+      # 2️⃣ SonarQube Scan
       # -------------------
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@master
@@ -26,15 +29,15 @@ jobs:
           scannerVersion: 8.0.1.6346
           scannerBinariesUrl: https://binaries.sonarsource.com/Distribution/sonar-scanner-cli
           args: >
-            -Dsonar.projectKey=my-project-key
-            -Dsonar.projectName="My Project"
-            -Dsonar.sources=.
+            -Dsonar.projectKey=fullstack-project
+            -Dsonar.projectName="Fullstack Project"
+            -Dsonar.sources=backend,frontend
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
       # -------------------
-      # Docker Build
+      # 3️⃣ Docker Build
       # -------------------
       - name: Build backend image
         run: docker build -t backend:latest ./backend
@@ -43,21 +46,21 @@ jobs:
         run: docker build -t frontend:latest ./frontend
 
       # -------------------
-      # Docker Login & Push to HTTPS Nexus
+      # 4️⃣ Docker Login & Push to EC2 Registry (HTTP port 5000)
       # -------------------
-      - name: Docker Login to Nexus (HTTPS)
+      - name: Docker Login to EC2 Registry
         run: |
-          echo "${{ secrets.NEXUS_PASSWORD }}" | docker login https://vivekbackend.duckdns.org:8443 -u "${{ secrets.NEXUS_USERNAME }}" --password-stdin
+          echo "${{ secrets.NEXUS_PASSWORD }}" | docker login http://vivekbackend.duckdns.org:5000 -u "${{ secrets.NEXUS_USERNAME }}" --password-stdin
 
       - name: Tag and Push backend
         run: |
-          docker tag backend:latest vivekbackend.duckdns.org:8443/backend:1
-          docker push vivekbackend.duckdns.org:8443/backend:1
+          docker tag backend:latest vivekbackend.duckdns.org:5000/backend:1
+          docker push vivekbackend.duckdns.org:5000/backend:1
 
       - name: Tag and Push frontend
         run: |
-          docker tag frontend:latest vivekbackend.duckdns.org:8443/frontend:1
-          docker push vivekbackend.duckdns.org:8443/frontend:1
+          docker tag frontend:latest vivekbackend.duckdns.org:5000/frontend:1
+          docker push vivekbackend.duckdns.org:5000/frontend:1
 
   deploy:
     name: Deploy to EC2
@@ -65,11 +68,17 @@ jobs:
     needs: build-and-scan
 
     steps:
+      # -------------------
+      # 5️⃣ Setup SSH Key
+      # -------------------
       - name: Setup SSH Key
         run: |
           echo "${{ secrets.EC2_KEY }}" > key.pem
           chmod 600 key.pem
 
+      # -------------------
+      # 6️⃣ Pull latest code and deploy with Docker Compose
+      # -------------------
       - name: Deploy to EC2
         run: |
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} << 'EOF'
@@ -79,5 +88,8 @@ jobs:
             docker compose up -d --build --remove-orphans
           EOF
 
+      # -------------------
+      # 7️⃣ Cleanup SSH Key
+      # -------------------
       - name: Cleanup SSH Key
         run: rm -f key.pem
