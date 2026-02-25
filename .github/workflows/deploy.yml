@@ -20,13 +20,12 @@ jobs:
           fetch-depth: 0
 
       # -------------------
-      # SonarQube Scan
+      # SonarQube Scan (built-in scanner)
       # -------------------
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@master
         with:
           projectBaseDir: .
-          scannerVersion: 9.9.0.65466
           args: >
             -Dsonar.projectKey=fullstack-project
             -Dsonar.projectName="Fullstack Project"
