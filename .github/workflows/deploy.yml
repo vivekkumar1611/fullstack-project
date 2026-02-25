@@ -17,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Full history needed for SonarQube
 
       # -------------------
       # SonarQube Scan
@@ -46,7 +46,7 @@ jobs:
         run: docker build -t frontend:latest ./frontend
 
       # -------------------
-      # Docker Insecure Registry Config
+      # Docker HTTP Registry Fix
       # -------------------
       - name: Configure Docker for insecure registry
         run: |
@@ -56,7 +56,7 @@ jobs:
       # -------------------
       # Docker Login & Push
       # -------------------
-      - name: Docker Login to Registry
+      - name: Docker Login
         run: |
           echo "${{ secrets.NEXUS_PASSWORD }}" | docker login http://vivekbackend.duckdns.org:5000 -u "${{ secrets.NEXUS_USERNAME }}" --password-stdin
 
