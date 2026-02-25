@@ -26,7 +26,8 @@ jobs:
         uses: sonarsource/sonarqube-scan-action@master
         with:
           projectBaseDir: .
-          scannerVersion: latest
+          scannerVersion: 9.9.1.69571   # valid scanner version
+          scannerBinariesUrl: https://binaries.sonarsource.com/Distribution/sonar-scanner-cli
           args: >
             -Dsonar.projectKey=fullstack-project
             -Dsonar.projectName="Fullstack Project"
