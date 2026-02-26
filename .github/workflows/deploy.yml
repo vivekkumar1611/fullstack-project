@@ -106,11 +106,12 @@ jobs:
               sudo apt install -y docker-compose
             fi
 
-            # Remove any old containers and orphans
-            sudo docker-compose down --remove-orphans
+            # Stop containers safely and remove conflicting ones
+            sudo docker-compose down || true
+            sudo docker rm -f nexus || true
 
-            # Start fresh containers
-            sudo docker-compose up -d --build
+            # Start containers
+            sudo docker-compose up -d --build --remove-orphans
           EOF
 
       # -------------------
