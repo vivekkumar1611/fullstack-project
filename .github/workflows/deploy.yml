@@ -106,11 +106,15 @@ jobs:
               sudo apt install -y docker-compose
             fi
 
-            # Stop containers safely and remove conflicting ones
+            # Stop Compose-managed containers
             sudo docker-compose down || true
-            sudo docker rm -f nexus || true
 
-            # Start containers
+            # Remove legacy containers that might conflict
+            for c in sonarqube nexus backend frontend pgadmin; do
+              sudo docker rm -f $c || true
+            done
+
+            # Recreate containers
             sudo docker-compose up -d --build --remove-orphans
           EOF
 
