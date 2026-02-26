@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
 
       # -------------------
-      # SonarQube Scan (built-in scanner)
+      # SonarQube Scan
       # -------------------
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@master
@@ -31,7 +31,6 @@ jobs:
             -Dsonar.projectName="Fullstack Project"
             -Dsonar.sources=backend,frontend
             -Dsonar.host.url=${{ env.SONAR_HOST_URL }}
-            -Dsonar.login=${{ env.SONAR_TOKEN }}
             -Dsonar.ssl.verificationMode=none
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -80,19 +79,40 @@ jobs:
     needs: build-and-scan
 
     steps:
+      # -------------------
+      # Setup SSH Key
+      # -------------------
       - name: Setup SSH Key
         run: |
           echo "${{ secrets.EC2_KEY }}" > key.pem
           chmod 600 key.pem
 
+      # -------------------
+      # Deploy to EC2
+      # -------------------
       - name: Deploy to EC2
         run: |
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} << 'EOF'
             cd ~/fullstack-project
-            git pull origin main
-            docker compose down
-            docker compose up -d --build --remove-orphans
+
+            # Reset local repo to match remote to avoid conflicts
+            git fetch origin main
+            git reset --hard origin/main
+
+            # Install docker-compose if missing
+            if ! command -v docker-compose &> /dev/null; then
+              echo "Installing docker-compose..."
+              sudo apt update
+              sudo apt install -y docker-compose
+            fi
+
+            # Restart containers
+            docker-compose down
+            docker-compose up -d --build --remove-orphans
           EOF
 
+      # -------------------
+      # Cleanup SSH Key
+      # -------------------
       - name: Cleanup SSH Key
         run: rm -f key.pem
