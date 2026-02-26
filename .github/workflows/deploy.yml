@@ -106,9 +106,9 @@ jobs:
               sudo apt install -y docker-compose
             fi
 
-            # Restart containers
-            docker-compose down
-            docker-compose up -d --build --remove-orphans
+            # Restart containers with sudo to avoid Docker socket permissions issue
+            sudo docker-compose down
+            sudo docker-compose up -d --build --remove-orphans
           EOF
 
       # -------------------
