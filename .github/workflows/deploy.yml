@@ -12,7 +12,7 @@ jobs:
 
     steps:
       # -------------------
-      # Checkout code
+      # Checkout repository
       # -------------------
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
           fetch-depth: 0
 
       # -------------------
-      # SonarQube Scan using Global Analysis token
+      # SonarQube Scan
       # -------------------
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@master
@@ -95,7 +95,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} << 'EOF'
             cd ~/fullstack-project
 
-            # Reset local repo to match remote to avoid conflicts
+            # Reset local repo to match remote
             git fetch origin main
             git reset --hard origin/main
 
