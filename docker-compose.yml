@@ -18,6 +18,7 @@ services:
       - db
     environment:
       DATABASE_URL: postgresql://admin:password@db:5432/appdb
+
   pgadmin:
     image: dpage/pgadmin4
     restart: always
@@ -40,6 +41,26 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+
+  nexus:
+    image: sonatype/nexus3
+    container_name: nexus
+    restart: always
+    ports:
+      - "8081:8081"
+
+  sonarqube:
+    image: sonarqube:lts
+    container_name: sonarqube
+    restart: always
+    environment:
+      - SONAR_JDBC_URL=jdbc:postgresql://db:5432/appdb
+      - SONAR_JDBC_USERNAME=admin
+      - SONAR_JDBC_PASSWORD=password
+    ports:
+      - "9000:9000"
+    depends_on:
+      - db
 
 volumes:
   postgres_data:
