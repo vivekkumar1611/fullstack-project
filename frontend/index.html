@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Management</title>
+</head>
+<body>
+    <h2>Add User</h2>
+
+    <input id="name" placeholder="Name">
+    <input id="email" placeholder="Email">
+    <button onclick="addUser()">Add</button>
+
+    <h3>Users</h3>
+    <ul id="users"></ul>
+
+<script>
+const API = "/api";
+
+async function addUser() {
+    const name = document.getElementById("name").value;
+    const email = document.getElementById("email").value;
+
+    await fetch(`${API}/users?name=${name}&email=${email}`, {
+        method: "POST"
+    });
+
+    loadUsers();
+}
+
+async function loadUsers() {
+    const res = await fetch(`${API}/users`);
+    const data = await res.json();
+
+    const list = document.getElementById("users");
+    list.innerHTML = "";
+    data.forEach(user => {
+        list.innerHTML += `<li>${user.name} - ${user.email}</li>`;
+    });
+}
+
+loadUsers();
+</script>
+</body>
+</html>
