@@ -4,7 +4,7 @@
     <title>User Management</title>
 </head>
 <body>
-    <h2>Add User</h2>
+    <h2>Vivek's Workspace - User Management</h2>
 
     <input id="name" placeholder="Name">
     <input id="email" placeholder="Email">
@@ -14,30 +14,85 @@
     <ul id="users"></ul>
 
 <script>
-const API = "/api";
+const API = "/api"; // make sure your backend is at this base URL
 
+// Add user
 async function addUser() {
     const name = document.getElementById("name").value;
     const email = document.getElementById("email").value;
 
-    await fetch(`${API}/users?name=${name}&email=${email}`, {
-        method: "POST"
+    if(!name || !email){
+        alert("Name and Email are required!");
+        return;
+    }
+
+    const res = await fetch(`${API}/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email })
     });
 
-    loadUsers();
+    if(res.ok){
+        loadUsers();
+        document.getElementById("name").value = "";
+        document.getElementById("email").value = "";
+    } else {
+        alert("Failed to add user");
+    }
 }
 
+// Load all users
 async function loadUsers() {
     const res = await fetch(`${API}/users`);
-    const data = await res.json();
+    const users = await res.json();
 
     const list = document.getElementById("users");
     list.innerHTML = "";
-    data.forEach(user => {
-        list.innerHTML += `<li>${user.name} - ${user.email}</li>`;
+
+    users.forEach(user => {
+        const li = document.createElement("li");
+        li.innerHTML = `${user.name} - ${user.email} 
+            <button onclick="deleteUser(${user.id})">Delete</button>
+            <button onclick="editUser(${user.id}, '${user.name}', '${user.email}')">Edit</button>`;
+        list.appendChild(li);
     });
 }
 
+// Delete user
+async function deleteUser(id) {
+    const res = await fetch(`${API}/users/${id}`, { method: "DELETE" });
+    if(res.ok) loadUsers();
+}
+
+// Edit user (prefill input and update)
+function editUser(id, name, email) {
+    document.getElementById("name").value = name;
+    document.getElementById("email").value = email;
+
+    // Change add button to update
+    const btn = document.querySelector("button[onclick='addUser()']");
+    btn.textContent = "Update";
+    btn.onclick = async function() {
+        const newName = document.getElementById("name").value;
+        const newEmail = document.getElementById("email").value;
+        const res = await fetch(`${API}/users/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: newName, email: newEmail })
+        });
+        if(res.ok){
+            loadUsers();
+            document.getElementById("name").value = "";
+            document.getElementById("email").value = "";
+            btn.textContent = "Add";
+            btn.onclick = addUser;
+        } else {
+            alert("Failed to update user");
+        }
+    }
+}
+
+// Initial load
 loadUsers();
 </script>
 </body>
