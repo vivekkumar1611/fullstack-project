@@ -1,0 +1,73 @@
+version: "3.8"
+
+services:
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend_v1
+      - frontend_v1
+
+
+
+  # Backend version 1
+  backend_v1:
+    build: ./backend
+    container_name: backend_v1
+    restart: always
+    expose:
+      - "8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/app
+    depends_on:
+      - db
+
+  # Backend version 2 (used during deployment)
+  backend_v2:
+    build: ./backend
+    container_name: backend_v2
+    restart: always
+    expose:
+      - "8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/app
+    depends_on:
+      - db
+    # Do not start this automatically; start manually during deploy
+
+  # Frontend version 1
+  frontend_v1:
+    build: ./frontend
+    container_name: frontend_v1
+    restart: always
+    expose:
+      - "80"
+
+  # Frontend version 2
+  frontend_v2:
+    build: ./frontend
+    container_name: frontend_v2
+    restart: always
+    expose:
+      - "80"
+    # Start manually during deploy
+
+  # Database
+  db:
+    image: postgres:15
+    container_name: db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: app
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

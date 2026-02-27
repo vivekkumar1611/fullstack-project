@@ -42,19 +42,18 @@ services:
     ports:
       - "5432:5432"
 
- nexus:
-  image: sonatype/nexus3
-  container_name: nexus
-  ports:
-    - "5000:5000"   # Docker registry (for pushes)
-    - "8081:8081"   # Nexus UI
-  restart: always
-  volumes:
-    - nexus-data:/nexus-data
+  nexus:
+    image: sonatype/nexus3
+    container_name: nexus
+    restart: always
+    ports:
+      - "5000:5000"   # Docker registry (for pushes)
+      - "8081:8081"   # Nexus UI
+    volumes:
+      - nexus-data:/nexus-data
     environment:
       INSTALL4J_ADD_VM_PARAMS: "-Xms512m -Xmx1024m -XX:MaxDirectMemorySize=512m"
 
-  # --- Dedicated SonarQube DB ---
   sonarqube-db:
     image: postgres:15
     restart: always
@@ -67,7 +66,6 @@ services:
     ports:
       - "5433:5432"
 
-  # --- SonarQube Service ---
   sonarqube:
     image: sonarqube:lts
     container_name: sonarqube
@@ -86,3 +84,4 @@ services:
 volumes:
   postgres_data:
   sonarqube_data:
+  nexus-data:
