@@ -1,53 +1,90 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Depends
+from sqlalchemy.orm import Session
+from pydantic import BaseModel, EmailStr
 from typing import List
 from database import SessionLocal
-from models import User  # SQLAlchemy model
+from models import User
 
-app = FastAPI()
+app = FastAPI(title="User API", version="1.0.0")
 
-class UserSchema(BaseModel):
+# -----------------------------
+# Database Dependency
+# -----------------------------
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# -----------------------------
+# Schemas
+# -----------------------------
+class UserCreate(BaseModel):
     name: str
-    email: str
+    email: EmailStr
 
-@app.get("/api/users")
-def get_users():
-    db = SessionLocal()
-    users = db.query(User).all()
-    db.close()
-    return [{"id": u.id, "name": u.name, "email": u.email} for u in users]
+class UserResponse(BaseModel):
+    id: int
+    name: str
+    email: EmailStr
 
-@app.post("/api/users")
-def create_user(user: UserSchema):
-    db = SessionLocal()
+    class Config:
+        from_attributes = True
+
+# -----------------------------
+# Health Endpoint (Required for Blue-Green)
+# -----------------------------
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
+
+# -----------------------------
+# Get All Users
+# -----------------------------
+@app.get("/api/users", response_model=List[UserResponse])
+def get_users(db: Session = Depends(get_db)):
+    return db.query(User).all()
+
+# -----------------------------
+# Create User
+# -----------------------------
+@app.post("/api/users", response_model=UserResponse)
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
     new_user = User(name=user.name, email=user.email)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    db.close()
-    return {"id": new_user.id, "name": new_user.name, "email": new_user.email}
+    return new_user
 
-@app.put("/api/users/{user_id}")
-def update_user(user_id: int, user: UserSchema):
-    db = SessionLocal()
+# -----------------------------
+# Update User
+# -----------------------------
+@app.put("/api/users/{user_id}", response_model=UserResponse)
+def update_user(user_id: int, user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.id == user_id).first()
+    
     if not db_user:
-        db.close()
         raise HTTPException(status_code=404, detail="User not found")
+
     db_user.name = user.name
     db_user.email = user.email
     db.commit()
-    db.close()
-    return {"id": db_user.id, "name": db_user.name, "email": db_user.email}
+    db.refresh(db_user)
 
+    return db_user
+
+# -----------------------------
+# Delete User
+# -----------------------------
 @app.delete("/api/users/{user_id}")
-def delete_user(user_id: int):
-    db = SessionLocal()
+def delete_user(user_id: int, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.id == user_id).first()
+
     if not db_user:
-        db.close()
         raise HTTPException(status_code=404, detail="User not found")
+
     db.delete(db_user)
     db.commit()
-    db.close()
-    return {"message": "Deleted"}
+
+    return {"message": "Deleted successfully"}
