@@ -48,7 +48,8 @@ jobs:
       # -------------------
       - name: Configure Docker for insecure registry
         run: |
-          echo '{ "insecure-registries":["vivekbackend.duckdns.org:5000"] }' | sudo tee /etc/docker/daemon.json
+          echo '{ "insecure-registries":["16.16.177.176:5000"] }' | sudo tee /etc/docker/daemon.json
+          sudo systemctl daemon-reload
           sudo systemctl restart docker
 
       # -------------------
@@ -56,7 +57,7 @@ jobs:
       # -------------------
       - name: Docker Login to Nexus
         run: |
-          echo "${{ secrets.NEXUS_PASSWORD }}" | docker login http://vivekbackend.duckdns.org:5000 \
+          echo "${{ secrets.NEXUS_PASSWORD }}" | docker login http://16.16.177.176:5000 \
             -u "${{ secrets.NEXUS_USERNAME }}" --password-stdin
 
       # -------------------
@@ -64,14 +65,13 @@ jobs:
       # -------------------
       - name: Push backend image
         run: |
-          docker tag backend:latest vivekbackend.duckdns.org:5000/backend:latest
-          docker push vivekbackend.duckdns.org:5000/backend:latest
+          docker tag backend:latest 16.16.177.176:5000/backend:latest
+          docker push 16.16.177.176:5000/backend:latest
 
       - name: Push frontend image
         run: |
-          docker tag frontend:latest vivekbackend.duckdns.org:5000/frontend:latest
-          docker push vivekbackend.duckdns.org:5000/frontend:latest
-
+          docker tag frontend:latest 16.16.177.176:5000/frontend:latest
+          docker push 16.16.177.176:5000/frontend:latest
 
   deploy:
     name: Deploy to EC2
@@ -110,8 +110,10 @@ jobs:
             # Stop running containers
             sudo docker-compose down || true
 
-            # Recreate containers
+            # Pull latest images from Nexus
             sudo docker-compose pull || true
+
+            # Recreate containers
             sudo docker-compose up -d --build --remove-orphans
 
           EOF
