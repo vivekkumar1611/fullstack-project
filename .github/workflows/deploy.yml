@@ -6,6 +6,7 @@ on:
       - main
 
 jobs:
+
   build-and-scan:
     name: Build, SonarQube Scan & Docker Push
     runs-on: ubuntu-latest
@@ -24,20 +25,17 @@ jobs:
       # -------------------
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@master
-        with:
-          projectBaseDir: .
-          args: >
-            -Dsonar.projectKey=fullstack-project
-            -Dsonar.projectName="Fullstack Project"
-            -Dsonar.sources=backend,frontend
-            -Dsonar.host.url=${{ env.SONAR_HOST_URL }}
-            -Dsonar.ssl.verificationMode=none
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=fullstack-project
+            -Dsonar.projectName=FullstackProject
+            -Dsonar.sources=backend,frontend
 
       # -------------------
-      # Docker Build
+      # Build Docker Images
       # -------------------
       - name: Build backend image
         run: docker build -t backend:latest ./backend
@@ -46,7 +44,7 @@ jobs:
         run: docker build -t frontend:latest ./frontend
 
       # -------------------
-      # Docker Insecure Registry Setup
+      # Configure Docker for Nexus (Insecure Registry)
       # -------------------
       - name: Configure Docker for insecure registry
         run: |
@@ -58,20 +56,22 @@ jobs:
       # -------------------
       - name: Docker Login to Nexus
         run: |
-          echo "${{ secrets.NEXUS_PASSWORD }}" | docker login http://vivekbackend.duckdns.org:5000 -u "${{ secrets.NEXUS_USERNAME }}" --password-stdin
+          echo "${{ secrets.NEXUS_PASSWORD }}" | docker login http://vivekbackend.duckdns.org:5000 \
+            -u "${{ secrets.NEXUS_USERNAME }}" --password-stdin
 
       # -------------------
-      # Docker Push
+      # Push Images to Nexus
       # -------------------
-      - name: Push backend image to Nexus
+      - name: Push backend image
         run: |
-          docker tag backend:latest vivekbackend.duckdns.org:5000/backend:1
-          docker push vivekbackend.duckdns.org:5000/backend:1
+          docker tag backend:latest vivekbackend.duckdns.org:5000/backend:latest
+          docker push vivekbackend.duckdns.org:5000/backend:latest
 
-      - name: Push frontend image to Nexus
+      - name: Push frontend image
         run: |
-          docker tag frontend:latest vivekbackend.duckdns.org:5000/frontend:1
-          docker push vivekbackend.duckdns.org:5000/frontend:1
+          docker tag frontend:latest vivekbackend.duckdns.org:5000/frontend:latest
+          docker push vivekbackend.duckdns.org:5000/frontend:latest
+
 
   deploy:
     name: Deploy to EC2
@@ -92,30 +92,28 @@ jobs:
       # -------------------
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i key.pem \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} << 'EOF'
+
             cd ~/fullstack-project
 
-            # Reset local repo to match remote
+            # Sync with GitHub
             git fetch origin main
             git reset --hard origin/main
 
             # Install docker-compose if missing
             if ! command -v docker-compose &> /dev/null; then
-              echo "Installing docker-compose..."
               sudo apt update
               sudo apt install -y docker-compose
             fi
 
-            # Stop Compose-managed containers
+            # Stop running containers
             sudo docker-compose down || true
 
-            # Remove legacy containers that might conflict
-            for c in sonarqube nexus backend frontend pgadmin; do
-              sudo docker rm -f $c || true
-            done
-
             # Recreate containers
+            sudo docker-compose pull || true
             sudo docker-compose up -d --build --remove-orphans
+
           EOF
 
       # -------------------
