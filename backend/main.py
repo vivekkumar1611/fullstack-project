@@ -2,10 +2,17 @@ from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from typing import List
-from database import SessionLocal
-from models import User
 
+from database import SessionLocal, engine
+from models import User, Base
+
+# -----------------------------
+# Create FastAPI App
+# -----------------------------
 app = FastAPI(title="User API", version="1.0.0")
+
+# 🔥 CREATE TABLES AUTOMATICALLY
+Base.metadata.create_all(bind=engine)
 
 # -----------------------------
 # Database Dependency
@@ -24,6 +31,7 @@ class UserCreate(BaseModel):
     name: str
     email: EmailStr
 
+
 class UserResponse(BaseModel):
     id: int
     name: str
@@ -32,6 +40,7 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
 # -----------------------------
 # Health Endpoint (Required for Blue-Green)
 # -----------------------------
@@ -39,12 +48,14 @@ class UserResponse(BaseModel):
 def health_check():
     return {"status": "healthy"}
 
+
 # -----------------------------
 # Get All Users
 # -----------------------------
 @app.get("/api/users", response_model=List[UserResponse])
 def get_users(db: Session = Depends(get_db)):
     return db.query(User).all()
+
 
 # -----------------------------
 # Create User
@@ -57,13 +68,14 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return new_user
 
+
 # -----------------------------
 # Update User
 # -----------------------------
 @app.put("/api/users/{user_id}", response_model=UserResponse)
 def update_user(user_id: int, user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.id == user_id).first()
-    
+
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -73,6 +85,7 @@ def update_user(user_id: int, user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(db_user)
 
     return db_user
+
 
 # -----------------------------
 # Delete User
