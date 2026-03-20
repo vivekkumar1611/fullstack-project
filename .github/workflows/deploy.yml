@@ -1,145 +1,102 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches:
-      - main
+push:
+branches:
+- main
 
 jobs:
 
-  build-and-scan:
-    name: Build, SonarQube Scan & Docker Push
-    runs-on: ubuntu-latest
+build-and-push:
+name: Build & Push to Nexus
+runs-on: ubuntu-latest
 
-    steps:
-      # -------------------
-      # Checkout repository
-      # -------------------
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+```
+steps:
+  - name: Checkout
+    uses: actions/checkout@v4
 
-      # -------------------
-      # SonarQube Scan
-      # -------------------
-      - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@master
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          args: >
-            -Dsonar.projectKey=fullstack-project
-            -Dsonar.projectName=FullstackProject
-            -Dsonar.sources=backend,frontend
+  # Build Images
+  - name: Build backend
+    run: docker build -t backend:latest ./backend
 
-      # -------------------
-      # Build Docker Images
-      # -------------------
-      - name: Build backend image
-        run: docker build -t backend:latest ./backend
+  - name: Build frontend
+    run: docker build -t frontend:latest ./frontend
 
-      - name: Build frontend image
-        run: docker build -t frontend:latest ./frontend
+  # Login to Nexus
+  - name: Docker Login
+    run: |
+      echo "${{ secrets.NEXUS_PASSWORD }}" | docker login ${{ secrets.NEXUS_IP }}:5000 \
+      -u "${{ secrets.NEXUS_USERNAME }}" --password-stdin
 
-      # -------------------
-      # Configure Docker for Nexus (Insecure Registry)
-      # -------------------
-      - name: Configure Docker for insecure registry
-        run: |
-          echo '{ "insecure-registries":["vivekbackend.duckdns.org:5000"] }' | sudo tee /etc/docker/daemon.json
-          sudo systemctl restart docker
+  # Tag + Push
+  - name: Push backend
+    run: |
+      docker tag backend:latest ${{ secrets.NEXUS_IP }}:5000/backend:latest
+      docker push ${{ secrets.NEXUS_IP }}:5000/backend:latest
 
-      # -------------------
-      # Docker Login to Nexus
-      # -------------------
-      - name: Docker Login to Nexus
-        run: |
-          echo "${{ secrets.NEXUS_PASSWORD }}" | docker login http://vivekbackend.duckdns.org:5000 \
-            -u "${{ secrets.NEXUS_USERNAME }}" --password-stdin
+  - name: Push frontend
+    run: |
+      docker tag frontend:latest ${{ secrets.NEXUS_IP }}:5000/frontend:latest
+      docker push ${{ secrets.NEXUS_IP }}:5000/frontend:latest
+```
 
-      # -------------------
-      # Push Images to Nexus
-      # -------------------
-      - name: Push backend image
-        run: |
-          docker tag backend:latest vivekbackend.duckdns.org:5000/backend:latest
-          docker push vivekbackend.duckdns.org:5000/backend:latest
+deploy:
+name: Deploy to EC2 (Blue-Green)
+runs-on: ubuntu-latest
+needs: build-and-push
 
-      - name: Push frontend image
-        run: |
-          docker tag frontend:latest vivekbackend.duckdns.org:5000/frontend:latest
-          docker push vivekbackend.duckdns.org:5000/frontend:latest
+```
+steps:
+  - name: Setup SSH
+    run: |
+      echo "${{ secrets.EC2_KEY }}" > key.pem
+      chmod 600 key.pem
 
-  deploy:
-    name: Deploy Blue-Green to EC2
-    runs-on: ubuntu-latest
-    needs: build-and-scan
+  - name: Deploy
+    run: |
+      ssh -o StrictHostKeyChecking=no -i key.pem \
+      ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} << 'EOF'
 
-    steps:
-      # -------------------
-      # Setup SSH Key
-      # -------------------
-      - name: Setup SSH Key
-        run: |
-          echo "${{ secrets.EC2_KEY }}" > key.pem
-          chmod 600 key.pem
+      cd ~/fullstack-project
 
-      # -------------------
-      # Deploy to EC2 with Blue-Green & Auto-Rollback
-      # -------------------
-      - name: Deploy to EC2
-        run: |
-          ssh -o StrictHostKeyChecking=no -i key.pem \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_IP }} << 'EOF'
+      # Pull latest images from Nexus
+      sudo docker pull ${{ secrets.NEXUS_IP }}:5000/backend:latest
+      sudo docker pull ${{ secrets.NEXUS_IP }}:5000/frontend:latest
 
-            cd ~/fullstack-project
+      # Decide blue/green
+      CURRENT=$(sudo docker ps --format '{{.Names}}' | grep backend-blue || true)
 
-            # Sync with GitHub
-            git fetch origin main
-            git reset --hard origin/main
+      if [[ -z "$CURRENT" ]]; then
+          NEW="blue"
+          OLD="green"
+      else
+          NEW="green"
+          OLD="blue"
+      fi
 
-            # Ensure docker-compose is installed
-            if ! command -v docker-compose &> /dev/null; then
-              sudo apt update
-              sudo apt install -y docker-compose
-            fi
+      echo "Deploying to $NEW"
 
-            # Determine current active backend (blue or green)
-            ACTIVE=$(curl -s http://127.0.0.1:8000/health | grep -o "healthy" || echo "none")
-            if [[ "$ACTIVE" == "healthy" ]]; then
-                CURRENT_BACKEND="blue"
-                NEW_BACKEND="green"
-            else
-                CURRENT_BACKEND="green"
-                NEW_BACKEND="blue"
-            fi
-            echo "Current backend: $CURRENT_BACKEND, deploying to $NEW_BACKEND"
+      # Start new container
+      sudo docker-compose up -d backend-$NEW
 
-            # Start new backend
-            sudo docker-compose up -d --build backend-$NEW_BACKEND
+      sleep 10
 
-            # Wait and check health
-            sleep 10
-            HEALTH=$(curl -s http://127.0.0.1:8001/health | grep -o "healthy" || echo "fail")
+      # Health check
+      if curl -f http://localhost:8000/health; then
+          echo "Healthy → switching"
 
-            if [[ "$HEALTH" == "healthy" ]]; then
-                echo "New backend is healthy, switching traffic..."
-                # Switch Nginx upstream
-                sed -i "s/backend-$CURRENT_BACKEND/backend-$NEW_BACKEND/" nginx.conf
-                sudo docker exec nginx nginx -s reload
-                echo "Deployment complete!"
-            else
-                echo "New backend failed, rolling back..."
-                sudo docker-compose down backend-$NEW_BACKEND
-                echo "Traffic remains on $CURRENT_BACKEND"
-            fi
+          sed -i "s/backend-$OLD/backend-$NEW/" nginx.conf
+          sudo docker exec proxy nginx -s reload
 
-          EOF
+          sudo docker-compose stop backend-$OLD
+      else
+          echo "Failed → rollback"
+          sudo docker-compose stop backend-$NEW
+      fi
 
-      # -------------------
-      # Cleanup SSH Key
-      # -------------------
-      - name: Cleanup SSH Key
-        run: rm -f key.pem
+      EOF
+
+  - name: Cleanup
+    run: rm -f key.pem
+```
