@@ -9,7 +9,6 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-EC2:
 resource "aws_instance" "fullstack" {
 
   ami           = data.aws_ami.ubuntu.id
