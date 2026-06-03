@@ -19,4 +19,4 @@ git clone https://github.com/vivekkumar1611/fullstack-project.git
 
 cd fullstack-project
 
-docker compose up -d
+docker-compose up -d
